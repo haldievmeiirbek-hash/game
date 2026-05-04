@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="kk">
+<head>
+    <meta charset="UTF-8">
+    <title>Менің алғашқы ойыным</title>
+    <style>
+        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #2c3e50; color: white; font-family: sans-serif; overflow: hidden; }
+        canvas { border: 5px solid #ecf0f1; background: #34495e; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        .score { position: absolute; top: 20px; font-size: 24px; }
+    </style>
+</head>
+<body>
+
+    <div class="score">Ұпай: <span id="scoreVal">0</span></div>
+    <canvas id="gameCanvas" width="600" height="400"></canvas>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreElement = document.getElementById('scoreVal');
+
+        // Ойын объектілері
+        let score = 0;
+        let player = { x: 50, y: 50, size: 30, speed: 5, color: '#e74c3c' };
+        let food = { x: 300, y: 200, size: 20, color: '#f1c40f' };
+
+        // Басқару түймелері
+        let keys = {};
+        window.addEventListener('keydown', (e) => keys[e.code] = true);
+        window.addEventListener('keyup', (e) => keys[e.code] = false);
+
+        function update() {
+            // Қозғалыс логикасы
+            if (keys['ArrowUp'] && player.y > 0) player.y -= player.speed;
+            if (keys['ArrowDown'] && player.y < canvas.height - player.size) player.y += player.speed;
+            if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+            if (keys['ArrowRight'] && player.x < canvas.width - player.size) player.x += player.speed;
+
+            // Шарды жеуді тексеру (Collision detection)
+            if (player.x < food.x + food.size &&
+                player.x + player.size > food.x &&
+                player.y < food.y + food.size &&
+                player.y + player.size > food.y) {
+                
+                score++;
+                scoreElement.innerText = score;
+                // Шарды жаңа жерге ауыстыру
+                food.x = Math.random() * (canvas.width - food.size);
+                food.y = Math.random() * (canvas.height - food.size);
+            }
+        }
+
+        function draw() {
+            // Экранды тазалау
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Ойыншыны салу
+            ctx.fillStyle = player.color;
+            ctx.fillRect(player.x, player.y, player.size, player.size);
+
+            // Шарды салу
+            ctx.fillStyle = food.color;
+            ctx.beginPath();
+            ctx.arc(food.x + food.size/2, food.y + food.size/2, food.size/2, 0, Math.PI * 2);
+            ctx.fill();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+
+        gameLoop();
+    </script>
+</body>
+</html>
