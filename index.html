@@ -2,76 +2,217 @@
 <html lang="kk">
 <head>
     <meta charset="UTF-8">
-    <title>Менің алғашқы ойыным</title>
+    <title>Cyber Shooter - Neon Battle</title>
     <style>
-        body { margin: 0; display: flex; justify-content: center; align-items: center; height: 100vh; background: #2c3e50; color: white; font-family: sans-serif; overflow: hidden; }
-        canvas { border: 5px solid #ecf0f1; background: #34495e; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
-        .score { position: absolute; top: 20px; font-size: 24px; }
+        body {
+            margin: 0;
+            background: #050505;
+            color: #0ff;
+            font-family: 'Courier New', Courier, monospace;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+        }
+        canvas {
+            border: 2px solid #0ff;
+            box-shadow: 0 0 20px #0ff;
+            cursor: crosshair;
+        }
+        #ui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+        }
+        .stat { font-size: 24px; text-shadow: 0 0 10px #0ff; }
     </style>
 </head>
 <body>
 
-    <div class="score">Ұпай: <span id="scoreVal">0</span></div>
-    <canvas id="gameCanvas" width="600" height="400"></canvas>
+    <div id="ui">
+        <div class="stat">ҰПАЙ: <span id="score">0</span></div>
+        <div class="stat" style="color: #f0f;">ӨМІР: <span id="lives">3</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
 
     <script>
         const canvas = document.getElementById('gameCanvas');
         const ctx = canvas.getContext('2d');
-        const scoreElement = document.getElementById('scoreVal');
+        const scoreEl = document.getElementById('score');
+        const livesEl = document.getElementById('lives');
 
-        // Ойын объектілері
+        canvas.width = 600;
+        canvas.height = 800;
+
         let score = 0;
-        let player = { x: 50, y: 50, size: 30, speed: 5, color: '#e74c3c' };
-        let food = { x: 300, y: 200, size: 20, color: '#f1c40f' };
+        let lives = 3;
+        let gameActive = true;
 
-        // Басқару түймелері
-        let keys = {};
-        window.addEventListener('keydown', (e) => keys[e.code] = true);
-        window.addEventListener('keyup', (e) => keys[e.code] = false);
+        // Объектілер жиынтығы
+        const projectiles = [];
+        const enemies = [];
+        const particles = [];
 
-        function update() {
-            // Қозғалыс логикасы
-            if (keys['ArrowUp'] && player.y > 0) player.y -= player.speed;
-            if (keys['ArrowDown'] && player.y < canvas.height - player.size) player.y += player.speed;
-            if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
-            if (keys['ArrowRight'] && player.x < canvas.width - player.size) player.x += player.speed;
+        // Ойыншы
+        const player = {
+            x: canvas.width / 2,
+            y: canvas.height - 50,
+            radius: 15,
+            color: '#0ff'
+        };
 
-            // Шарды жеуді тексеру (Collision detection)
-            if (player.x < food.x + food.size &&
-                player.x + player.size > food.x &&
-                player.y < food.y + food.size &&
-                player.y + player.size > food.y) {
-                
-                score++;
-                scoreElement.innerText = score;
-                // Шарды жаңа жерге ауыстыру
-                food.x = Math.random() * (canvas.width - food.size);
-                food.y = Math.random() * (canvas.height - food.size);
+        // Бөлшектер (жарылыс эффектісі)
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x; this.y = y; this.color = color;
+                this.radius = Math.random() * 3;
+                this.velocity = { x: (Math.random() - 0.5) * 5, y: (Math.random() - 0.5) * 5 };
+                this.alpha = 1;
+            }
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = this.alpha;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.fill();
+                ctx.restore();
+            }
+            update() {
+                this.x += this.velocity.x;
+                this.y += this.velocity.y;
+                this.alpha -= 0.02;
             }
         }
 
-        function draw() {
-            // Экранды тазалау
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Оқтар
+        class Projectile {
+            constructor(x, y) {
+                this.x = x; this.y = y;
+                this.radius = 4;
+                this.color = '#fff';
+                this.velocity = -10;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#0ff';
+                ctx.fill();
+            }
+            update() { this.y += this.velocity; }
+        }
 
-            // Ойыншыны салу
-            ctx.fillStyle = player.color;
-            ctx.fillRect(player.x, player.y, player.size, player.size);
+        // Жаулар
+        class Enemy {
+            constructor() {
+                this.radius = Math.random() * (30 - 10) + 10;
+                this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
+                this.y = -this.radius;
+                this.color = `hsl(${Math.random() * 360}, 70%, 50%)`;
+                this.velocity = Math.random() * 2 + 1;
+            }
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                ctx.strokeStyle = this.color;
+                ctx.lineWidth = 3;
+                ctx.stroke();
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = this.color;
+            }
+            update() { this.y += this.velocity; }
+        }
 
-            // Шарды салу
-            ctx.fillStyle = food.color;
+        // Оқ ату (Тінтуірді басқанда немесе Space)
+        window.addEventListener('mousedown', () => {
+            if (!gameActive) return;
+            projectiles.push(new Projectile(player.x, player.y));
+        });
+
+        // Қозғалыс (Тінтуірмен)
+        window.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            player.x = e.clientX - rect.left;
+        });
+
+        function spawnEnemies() {
+            if (!gameActive) return;
+            enemies.push(new Enemy());
+            setTimeout(spawnEnemies, 1000);
+        }
+
+        function animate() {
+            if (!gameActive) return;
+            requestAnimationFrame(animate);
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ойыншыны сызу
             ctx.beginPath();
-            ctx.arc(food.x + food.size/2, food.y + food.size/2, food.size/2, 0, Math.PI * 2);
-            ctx.fill();
+            ctx.moveTo(player.x, player.y - 20);
+            ctx.lineTo(player.x - 15, player.y + 10);
+            ctx.lineTo(player.x + 15, player.y + 10);
+            ctx.closePath();
+            ctx.strokeStyle = player.color;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+
+            // Оқтарды жаңарту
+            projectiles.forEach((p, index) => {
+                p.update(); p.draw();
+                if (p.y < 0) projectiles.splice(index, 1);
+            });
+
+            // Бөлшектерді жаңарту
+            particles.forEach((part, index) => {
+                if (part.alpha <= 0) particles.splice(index, 1);
+                else { part.update(); part.draw(); }
+            });
+
+            // Жауларды жаңарту
+            enemies.forEach((enemy, eIndex) => {
+                enemy.update(); enemy.draw();
+
+                // Ойыншымен соқтығысу
+                const distToPlayer = Math.hypot(player.x - enemy.x, player.y - enemy.y);
+                if (distToPlayer < enemy.radius + 15) {
+                    lives--;
+                    livesEl.innerText = lives;
+                    enemies.splice(eIndex, 1);
+                    if (lives <= 0) {
+                        gameActive = false;
+                        alert("ОЙЫН БІТТІ! Ұпайыңыз: " + score);
+                        location.reload();
+                    }
+                }
+
+                // Оқпен соқтығысу
+                projectiles.forEach((p, pIndex) => {
+                    const dist = Math.hypot(p.x - enemy.x, p.y - enemy.y);
+                    if (dist < enemy.radius + p.radius) {
+                        // Жарылыс жасау
+                        for(let i=0; i<15; i++) particles.push(new Particle(enemy.x, enemy.y, enemy.color));
+                        
+                        score += 100;
+                        scoreEl.innerText = score;
+                        setTimeout(() => {
+                            enemies.splice(eIndex, 1);
+                            projectiles.splice(pIndex, 1);
+                        }, 0);
+                    }
+                });
+
+                if (enemy.y > canvas.height) enemies.splice(eIndex, 1);
+            });
         }
 
-        function gameLoop() {
-            update();
-            draw();
-            requestAnimationFrame(gameLoop);
-        }
-
-        gameLoop();
+        spawnEnemies();
+        animate();
     </script>
 </body>
 </html>
